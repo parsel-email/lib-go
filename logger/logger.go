@@ -73,8 +73,8 @@ func GetTraceID(ctx context.Context) string {
 }
 
 // contextAttrs extracts common attributes from context
-func contextAttrs(ctx context.Context) []interface{} {
-	var attrs []interface{}
+func contextAttrs(ctx context.Context) []any {
+	var attrs []any
 
 	// Add request ID if available
 	if requestID := GetRequestID(ctx); requestID != "" {
@@ -90,28 +90,28 @@ func contextAttrs(ctx context.Context) []interface{} {
 }
 
 // Debug logs a debug message with context
-func Debug(ctx context.Context, msg string, args ...interface{}) {
+func Debug(ctx context.Context, msg string, args ...any) {
 	attrs := contextAttrs(ctx)
 	attrs = append(attrs, args...)
 	slog.Debug(msg, attrs...)
 }
 
 // Info logs an info message with context
-func Info(ctx context.Context, msg string, args ...interface{}) {
+func Info(ctx context.Context, msg string, args ...any) {
 	attrs := contextAttrs(ctx)
 	attrs = append(attrs, args...)
 	slog.Info(msg, attrs...)
 }
 
 // Warn logs a warning message with context
-func Warn(ctx context.Context, msg string, args ...interface{}) {
+func Warn(ctx context.Context, msg string, args ...any) {
 	attrs := contextAttrs(ctx)
 	attrs = append(attrs, args...)
 	slog.Warn(msg, attrs...)
 }
 
 // Error logs an error message with context
-func Error(ctx context.Context, msg string, args ...interface{}) {
+func Error(ctx context.Context, msg string, args ...any) {
 	attrs := contextAttrs(ctx)
 	attrs = append(attrs, args...)
 	slog.Error(msg, attrs...)
@@ -119,7 +119,7 @@ func Error(ctx context.Context, msg string, args ...interface{}) {
 
 // WithFields returns a new logger with the provided fields
 func WithFields(fields Fields) *slog.Logger {
-	attrs := make([]interface{}, 0, len(fields)*2)
+	attrs := make([]any, 0, len(fields)*2)
 	for k, v := range fields {
 		attrs = append(attrs, k, v)
 	}
