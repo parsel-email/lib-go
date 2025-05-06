@@ -1,7 +1,7 @@
 REPO=github.com/parsel-email/lib-go
 
 # Go build flags for SQLite extensions
-GO_BUILD_FLAGS=-tags "fts5 json1 sqlite_vec"
+GO_BUILD_FLAGS=-tags "fts5 json1"
 
 # CGO settings
 export CGO_ENABLED=1
@@ -60,7 +60,7 @@ check-sqlite:
 	@sqlite3 --version
 	@echo "\nAvailable SQLite compile options (for system SQLite):"
 	@echo "PRAGMA compile_options;" | sqlite3 | grep -E 'ENABLE_FTS5|ENABLE_JSON1'
-	@echo "\nNote: For the Go application, extensions like fts5, json1, and sqlite_vec are enabled via build tags ('fts5 json1 sqlite_vec')."
-	@echo "To verify sqlite-vec functions within a Go test or application, check for functions like 'vector_to_json' as done in database_test.go."
+	@echo "\nNote: For the Go application, extensions like fts5 and json1 are enabled via build tags."
+	@echo "Vector operations are supported natively in libSQL with F32_BLOB type and vector functions."
 	
 .PHONY: build test clean db-new db-migrate-up db-migrate-down db-migrate-version sqlc-generate check-sqlite

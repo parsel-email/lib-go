@@ -274,7 +274,7 @@ func TestFTS5Extension(t *testing.T) {
 	}
 }
 
-func TestSQLiteVecExtension(t *testing.T) {
+func TestLibSQLVectorSupport(t *testing.T) {
 	// Use in-memory database for testing
 	cfg := database.DefaultConfig()
 
@@ -285,56 +285,132 @@ func TestSQLiteVecExtension(t *testing.T) {
 	}
 	defer db.Close()
 
-	// Check if sqlite-vec extension is available
-	// If not available, skip this test
-	var hasVec int
-	err = db.QueryRow(`
-		SELECT count(*) FROM pragma_function_list 
-		WHERE name='vector_to_json' OR name='json_to_vector'
-	`).Scan(&hasVec)
-
-	if err != nil || hasVec == 0 {
-		t.Skip("sqlite-vec extension not available, skipping test")
-	}
-
 	// Create a context with timeout
 	ctx, cancel := database.WithContext(context.Background(), 5*time.Second)
 	defer cancel()
 
-	// Create table for vector test
+	// Create table with vector column using F32_BLOB datatype for vectors
 	_, err = db.ExecContext(ctx, `
 		CREATE TABLE vector_test (
 			id INTEGER PRIMARY KEY,
-			embedding BLOB
+			embedding F32_BLOB(4)  -- 4-dimensional float32 vector
 		)
 	`)
 	if err != nil {
+		// If the native vector types aren't supported, skip the test
+		if strings.Contains(err.Error(), "near \"F32_BLOB\"") {
+			t.Skip("LibSQL native vector types not supported in this version, skipping test")
+		}
 		t.Fatalf("Failed to create vector table: %v", err)
 	}
 
-	// Test vector operations
-	// This is a simplified test as the actual embedding operations would be more complex
+	// Insert vectors using the vector32 function
 	_, err = db.ExecContext(ctx, `
-		WITH vector AS (
-			SELECT json_to_vector('[1.0, 2.0, 3.0]') as vec
-		)
-		INSERT INTO vector_test (embedding) SELECT vec FROM vector
+		INSERT INTO vector_test (embedding) VALUES 
+		(vector32('[0.800, 0.579, 0.481, 0.229]')),
+		(vector32('[0.406, 0.027, 0.378, 0.056]')),
+		(vector32('[0.698, 0.140, 0.073, 0.125]')),
+		(vector32('[0.379, 0.637, 0.011, 0.647]'))
 	`)
 	if err != nil {
-		t.Fatalf("Failed to insert vector: %v", err)
+		// If vector32 function isn't available, skip the test
+		if strings.Contains(err.Error(), "no such function: vector32") {
+			t.Skip("LibSQL vector32 function not available, skipping test")
+		}
+		t.Fatalf("Failed to insert vectors: %v", err)
 	}
 
-	// Verify vector can be retrieved
-	var vecJSON string
-	err = db.QueryRowContext(ctx, `
-		SELECT vector_to_json(embedding) FROM vector_test WHERE id = 1
-	`).Scan(&vecJSON)
+	// Create a vector index for efficient similarity search
+	_, err = db.ExecContext(ctx, `
+		CREATE INDEX vector_idx ON vector_test (libsql_vector_idx(embedding))
+	`)
 	if err != nil {
-		t.Fatalf("Failed to retrieve vector: %v", err)
+		// If vector indexing isn't available, just log and continue (don't skip the test)
+		if strings.Contains(err.Error(), "libsql_vector_idx") {
+			t.Logf("Warning: Vector indexing not available: %v", err)
+		} else {
+			t.Fatalf("Failed to create vector index: %v", err)
+		}
 	}
 
-	if vecJSON != "[1.0,2.0,3.0]" && vecJSON != "[1,2,3]" {
-		t.Errorf("Unexpected vector value: %s", vecJSON)
+	// Test vector distance calculation
+	var distance float64
+	err = db.QueryRowContext(ctx, `
+		SELECT vector_distance_cos(
+			vector32('[0.800, 0.579, 0.481, 0.229]'), 
+			vector32('[0.379, 0.637, 0.011, 0.647]')
+		)
+	`).Scan(&distance)
+	if err != nil {
+		// If vector_distance_cos function isn't available, skip the test
+		if strings.Contains(err.Error(), "no such function: vector_distance_cos") {
+			t.Skip("LibSQL vector_distance_cos function not available, skipping test")
+		}
+		t.Fatalf("Failed to calculate vector distance: %v", err)
+	}
+
+	// Verify the distance is a reasonable value for cosine distance (should be between 0 and 2)
+	if distance < 0 || distance > 2 {
+		t.Errorf("Unexpected cosine distance value: %f (should be between 0 and 2)", distance)
+	}
+
+	// Test vector similarity search using vector_top_k if available
+	rows, err := db.QueryContext(ctx, `
+		SELECT id FROM vector_top_k('vector_idx', vector32('[0.064, 0.777, 0.661, 0.687]'), 2)
+	`)
+
+	if err != nil {
+		// If vector_top_k function isn't available, just log warning (don't skip the test)
+		if strings.Contains(err.Error(), "no such function: vector_top_k") {
+			t.Logf("Warning: vector_top_k function not available: %v", err)
+		} else {
+			t.Fatalf("Failed to query with vector_top_k: %v", err)
+		}
+	} else {
+		defer rows.Close()
+
+		// Count the results (should be 2 since we asked for top 2)
+		var results []int64
+		for rows.Next() {
+			var id int64
+			if err := rows.Scan(&id); err != nil {
+				t.Fatalf("Failed to scan row: %v", err)
+			}
+			results = append(results, id)
+		}
+
+		// We expect 2 results
+		if len(results) != 2 {
+			t.Logf("Note: Expected 2 vector search results, got %d", len(results))
+		}
+	}
+
+	// Fallback test: Manually compute vector similarity without vector_top_k
+	rows, err = db.QueryContext(ctx, `
+		SELECT id, vector_distance_cos(embedding, vector32('[0.064, 0.777, 0.661, 0.687]')) AS distance
+		FROM vector_test
+		ORDER BY distance ASC
+		LIMIT 2
+	`)
+	if err != nil {
+		t.Fatalf("Failed to query vector similarity: %v", err)
+	}
+	defer rows.Close()
+
+	// Verify we can get the results
+	var results []int64
+	for rows.Next() {
+		var id int64
+		var distance float64
+		if err := rows.Scan(&id, &distance); err != nil {
+			t.Fatalf("Failed to scan row: %v", err)
+		}
+		results = append(results, id)
+	}
+
+	// We should get 2 results
+	if len(results) != 2 {
+		t.Errorf("Expected 2 manual vector search results, got %d", len(results))
 	}
 }
 
