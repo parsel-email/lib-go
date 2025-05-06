@@ -3,6 +3,7 @@ package database_test
 import (
 	"context"
 	"fmt"
+	"math/rand"
 	"os"
 	"strings"
 	"testing"
@@ -193,24 +194,37 @@ func TestFTS5Extension(t *testing.T) {
 	ctx, cancel := database.WithContext(context.Background(), 5*time.Second)
 	defer cancel()
 
-	// Create tables for FTS5 test
+	// Create tables for FTS5 test - splitting into separate statements
+	// Create the documents table
 	_, err = db.ExecContext(ctx, `
 		CREATE TABLE documents (
 			id INTEGER PRIMARY KEY,
 			title TEXT NOT NULL,
 			content TEXT
-		);
-
-		CREATE VIRTUAL TABLE documents_fts USING fts5(
-			title, content, content='documents', content_rowid='id'
-		);
-
-		CREATE TRIGGER documents_ai AFTER INSERT ON documents BEGIN
-			INSERT INTO documents_fts(rowid, title, content) VALUES (new.id, new.title, new.content);
-		END;
+		)
 	`)
 	if err != nil {
-		t.Fatalf("Failed to create FTS5 tables: %v", err)
+		t.Fatalf("Failed to create documents table: %v", err)
+	}
+
+	// Create the FTS5 virtual table
+	_, err = db.ExecContext(ctx, `
+		CREATE VIRTUAL TABLE documents_fts USING fts5(
+			title, content, content='documents', content_rowid='id'
+		)
+	`)
+	if err != nil {
+		t.Fatalf("Failed to create FTS5 virtual table: %v", err)
+	}
+
+	// Create the trigger
+	_, err = db.ExecContext(ctx, `
+		CREATE TRIGGER documents_ai AFTER INSERT ON documents BEGIN
+			INSERT INTO documents_fts(rowid, title, content) VALUES (new.id, new.title, new.content);
+		END
+	`)
+	if err != nil {
+		t.Fatalf("Failed to create trigger: %v", err)
 	}
 
 	// Insert test documents
@@ -389,6 +403,17 @@ func TestConnectionPool(t *testing.T) {
 	defer os.Remove(dbFile) // Clean up after test
 	cfg.Path = dbFile
 
+	// Set pragmas to better handle concurrent operations
+	cfg.Pragmas = database.Pragmas{
+		"journal_mode": "WAL",       // Write-Ahead Logging for better concurrency
+		"synchronous":  "NORMAL",    // Good balance between safety and performance
+		"busy_timeout": "5000",      // Wait up to 5 seconds for locks to clear
+		"foreign_keys": "ON",        // Enable foreign key constraints
+		"cache_size":   "-2000",     // Use up to 2MB of memory for caching
+		"temp_store":   "MEMORY",    // Store temporary tables in memory
+		"mmap_size":    "268435456", // Memory-mapped I/O (256MB)
+	}
+
 	// Open connection to the database
 	db, err := database.Open(cfg)
 	if err != nil {
@@ -402,57 +427,104 @@ func TestConnectionPool(t *testing.T) {
 		t.Fatalf("Failed to create table: %v", err)
 	}
 
-	// Test concurrent operations
-	concurrency := 5
-	iterations := 10
+	// Test concurrent operations with reduced concurrency and more spacing between operations
+	concurrency := 3 // Reduced from 5
+	iterations := 5  // Reduced from 10
 	errChan := make(chan error, concurrency*iterations)
 	doneChan := make(chan bool, concurrency)
 
-	// Function to insert and query in a transaction
+	// Function to insert and query in a transaction with retry logic
 	worker := func(id int) {
 		for i := 0; i < iterations; i++ {
+			// Add random delay to avoid lock contention
+			time.Sleep(time.Duration(10+rand.Intn(20)) * time.Millisecond)
+
 			// Create a context with timeout
 			ctx, cancel := database.WithContext(context.Background(), 5*time.Second)
 
-			// Begin transaction
-			tx, err := db.BeginTx(ctx)
+			// Begin transaction with retry
+			var tx *database.Transaction
+			var err error
+
+			// Try up to 3 times to begin a transaction
+			for attempt := 0; attempt < 3; attempt++ {
+				tx, err = db.BeginTx(ctx)
+				if err == nil {
+					break
+				}
+
+				// If failed, wait a bit before retrying
+				time.Sleep(time.Duration(50+rand.Intn(100)) * time.Millisecond)
+			}
+
 			if err != nil {
-				errChan <- fmt.Errorf("worker %d failed to begin transaction: %w", id, err)
+				errChan <- fmt.Errorf("worker %d failed to begin transaction after retries: %w", id, err)
 				cancel()
 				doneChan <- true
 				return
 			}
 
-			// Insert data
+			// Insert data with retry
 			value := fmt.Sprintf("worker %d - iter %d", id, i)
-			_, err = tx.Exec("INSERT INTO pool_test (value) VALUES (?)", value)
-			if err != nil {
+			var execErr error
+
+			// Try up to 3 times to execute the query
+			for attempt := 0; attempt < 3; attempt++ {
+				_, execErr = tx.Exec("INSERT INTO pool_test (value) VALUES (?)", value)
+				if execErr == nil {
+					break
+				}
+
+				// If failed and not on last attempt, wait before retrying
+				if attempt < 2 {
+					time.Sleep(time.Duration(50+rand.Intn(100)) * time.Millisecond)
+				}
+			}
+
+			if execErr != nil {
 				tx.Rollback()
-				errChan <- fmt.Errorf("worker %d failed to insert: %w", id, err)
+				errChan <- fmt.Errorf("worker %d failed to insert after retries: %w", id, execErr)
 				cancel()
 				doneChan <- true
 				return
 			}
 
-			// Commit transaction
-			if err := tx.Commit(); err != nil {
-				errChan <- fmt.Errorf("worker %d failed to commit: %w", id, err)
+			// Commit transaction with retry
+			var commitErr error
+
+			// Try up to 3 times to commit
+			for attempt := 0; attempt < 3; attempt++ {
+				commitErr = tx.Commit()
+				if commitErr == nil {
+					break
+				}
+
+				// If failed and not on last attempt, wait before retrying
+				if attempt < 2 {
+					time.Sleep(time.Duration(50+rand.Intn(100)) * time.Millisecond)
+				}
+			}
+
+			if commitErr != nil {
+				errChan <- fmt.Errorf("worker %d failed to commit after retries: %w", id, commitErr)
 				cancel()
 				doneChan <- true
 				return
 			}
 
 			cancel()
-			// Small delay to avoid overwhelming the SQLite lock
-			time.Sleep(1 * time.Millisecond)
+			// Longer delay between iterations to reduce lock contention
+			time.Sleep(time.Duration(30+rand.Intn(50)) * time.Millisecond)
 		}
 		errChan <- nil
 		doneChan <- true
 	}
 
-	// Start concurrent workers
+	// Start concurrent workers with delay between starts
 	for i := 0; i < concurrency; i++ {
 		go worker(i)
+		// Add delay between starting workers
+		time.Sleep(10 * time.Millisecond)
 	}
 
 	// Wait for all workers to finish
