@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/tursodatabase/libsql-client-go/libsql"
+	_ "github.com/tursodatabase/go-libsql"
 )
 
 // DB represents a database connection
@@ -45,33 +45,17 @@ func Open(cfg Config) (*DB, error) {
 	var db *sql.DB
 
 	// Check if the connection string is for a remote database or local file
-	if strings.HasPrefix(cfg.Path, "libsql://") {
-		// Configure for remote libSQL database
-		connOpts := []libsql.Option{}
+	// For local file or in-memory database
+	dsn := formatDSN(cfg.Path, cfg.Pragmas)
 
-		// Add auth token if provided
-		if cfg.AuthToken != "" {
-			connOpts = append(connOpts, libsql.WithAuthToken(cfg.AuthToken))
-		}
+	// For local SQLite databases, use the libsql connector with file: prefix
+	if dsn != ":memory:" && !strings.HasPrefix(dsn, "file:") {
+		dsn = "file:" + dsn
+	}
 
-		// Create a connector for the remote database
-		connector, err := libsql.NewConnector(cfg.Path, connOpts...)
-		if err != nil {
-			return nil, fmt.Errorf("creating libSQL connector for remote database: %w", err)
-		}
-
-		// Open the database with the connector
-		db = sql.OpenDB(connector)
-	} else {
-		// For local file or in-memory database
-		dsn := formatDSN(cfg.Path, cfg.Pragmas)
-
-		// Open the database with the libSQL connector
-		connector, err := libsql.NewConnector(dsn, nil)
-		if err != nil {
-			return nil, fmt.Errorf("creating libSQL connector for local database: %w", err)
-		}
-		db = sql.OpenDB(connector)
+	db, err := sql.Open("libsql", dsn)
+	if err != nil {
+		return nil, fmt.Errorf("opening database: %w", err)
 	}
 
 	if db == nil {
