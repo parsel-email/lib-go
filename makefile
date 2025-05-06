@@ -1,7 +1,6 @@
 REPO=github.com/parsel-email/lib-go
 
 # Go build flags for SQLite extensions
-GO_BUILD_FLAGS=-tags "fts5 json1"
 
 # CGO settings
 export CGO_ENABLED=1
@@ -9,12 +8,12 @@ export CGO_ENABLED=1
 # Build the application with SQLite extensions
 build:
 	@echo "Building with SQLite extensions..."
-	@go build $(GO_BUILD_FLAGS) ./...
+	@go build ./...
 
 # Test the application with SQLite extensions
 test:
 	@echo "Testing with SQLite extensions..."
-	@go test $(GO_BUILD_FLAGS) ./... -v
+	@go test ./... -v
 
 # Clean build artifacts
 clean:
@@ -31,22 +30,22 @@ db-new:
 		exit 1; \
 	fi
 	@echo "Creating new migration: $(name)"
-	@go run $(GO_BUILD_FLAGS) cmd/migrate/main.go new $(name)
+	@go run cmd/migrate/main.go new $(name)
 	
 # Run migrations up
 db-migrate-up:
 	@echo "Running migrations up..."
-	@go run $(GO_BUILD_FLAGS) cmd/migrate/main.go up
+	@go run cmd/migrate/main.go up
 
 # Run migrations down
 db-migrate-down:
 	@echo "Running migrations down..."
-	@go run $(GO_BUILD_FLAGS) cmd/migrate/main.go down
+	@go run cmd/migrate/main.go down
 
 # Get current migration version
 db-migrate-version:
 	@echo "Current migration version:"
-	@go run $(GO_BUILD_FLAGS) cmd/migrate/main.go version
+	@go run cmd/migrate/main.go version
 
 # Generate SQLC code from SQL queries
 sqlc-generate:
