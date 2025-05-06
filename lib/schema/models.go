@@ -5,13 +5,13 @@
 package schema
 
 import (
-	"database/sql"
+	"time"
 )
 
 type User struct {
-	ID         interface{}  `json:"id"`
-	Email      string       `json:"email"`
-	Provider   string       `json:"provider"`
-	ProviderID string       `json:"provider_id"`
-	CreatedAt  sql.NullTime `json:"created_at"`
+	ID         interface{} `json:"id"`
+	Email      string      `json:"email"`
+	Provider   string      `json:"provider"`
+	ProviderID string      `json:"provider_id"`
+	CreatedAt  time.Time   `json:"created_at"`
 }
