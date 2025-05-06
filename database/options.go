@@ -4,10 +4,10 @@ import (
 	"strings"
 )
 
-// Pragmas represents SQLite connection pragmas
+// Pragmas represents SQLite/libSQL connection pragmas
 type Pragmas map[string]string
 
-// DefaultPragmas returns the default SQLite pragmas for optimized performance
+// DefaultPragmas returns the default pragmas for optimized performance
 func DefaultPragmas() Pragmas {
 	return Pragmas{
 		"journal_mode": "WAL",       // Write-Ahead Logging for better concurrency
@@ -19,7 +19,7 @@ func DefaultPragmas() Pragmas {
 	}
 }
 
-// formatDSN formats a DSN (Data Source Name) string with required extensions and pragmas
+// formatDSN formats a DSN (Data Source Name) string with required pragmas
 func formatDSN(path string, pragmas Pragmas) string {
 	// Start with the base path
 	dsn := path
@@ -27,12 +27,9 @@ func formatDSN(path string, pragmas Pragmas) string {
 	// Build query parameters
 	var params []string
 
-	// Always include our required extensions
-	params = append(params, "_extensions=json1,fts5,sqlite_vec")
-
 	// Add pragmas
 	for key, value := range pragmas {
-		params = append(params, "_"+key+"="+value)
+		params = append(params, key+"="+value)
 	}
 
 	// Add query string if parameters exist

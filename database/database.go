@@ -1,13 +1,14 @@
-// Package database provides a simple SQLite interface with extensions
+// Package database provides a simple libSQL interface with extensions
 package database
 
 import (
 	"context"
 	"database/sql"
 	"fmt"
+	"strings"
 	"time"
 
-	_ "github.com/mattn/go-sqlite3" // SQLite driver
+	"github.com/tursodatabase/libsql-client-go/libsql"
 )
 
 // DB represents a database connection
@@ -18,6 +19,7 @@ type DB struct {
 // Config holds database configuration
 type Config struct {
 	Path            string
+	AuthToken       string // libSQL auth token for remote connections
 	MaxOpenConns    int
 	MaxIdleConns    int
 	ConnMaxLifetime time.Duration
@@ -29,6 +31,7 @@ type Config struct {
 func DefaultConfig() Config {
 	return Config{
 		Path:            ":memory:", // Default to in-memory database
+		AuthToken:       "",         // Default to no auth token
 		MaxOpenConns:    5,
 		MaxIdleConns:    5,
 		ConnMaxLifetime: time.Hour,
@@ -37,15 +40,37 @@ func DefaultConfig() Config {
 	}
 }
 
-// Open creates a new database connection with JSON1, FTS5, and sqlite-vec extensions
+// Open creates a new database connection with libSQL
 func Open(cfg Config) (*DB, error) {
-	// Format the DSN with required extensions and pragmas
-	dsn := formatDSN(cfg.Path, cfg.Pragmas)
+	var db *sql.DB
 
-	// Open the database connection
-	db, err := sql.Open("sqlite3", dsn)
-	if err != nil {
-		return nil, fmt.Errorf("opening database: %w", err)
+	// Check if the connection string is for a remote database or local file
+	if strings.HasPrefix(cfg.Path, "libsql://") {
+		// Configure for remote libSQL database
+		connOpts := []libsql.Option{
+			libsql.WithAuthToken(cfg.AuthToken),
+		}
+
+		// Create a connector for the remote database
+		connector, err := libsql.NewConnector(cfg.Path, connOpts...)
+		if err != nil {
+			return nil, fmt.Errorf("creating libSQL connector: %w", err)
+		}
+
+		// Open the database with the connector
+		db = sql.OpenDB(connector)
+	} else {
+		// For local file or in-memory database, use a direct connection
+		dsn := formatDSN(cfg.Path, cfg.Pragmas)
+
+		// Create a connector for the local database
+		connector, err := libsql.NewConnector(dsn, nil)
+		if err != nil {
+			return nil, fmt.Errorf("creating libSQL connector: %w", err)
+		}
+
+		// Open the database with the connector
+		db = sql.OpenDB(connector)
 	}
 
 	// Configure connection pool

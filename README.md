@@ -4,22 +4,22 @@ This repository contains shared Go library code for the Parsel project.
 
 ## Components
 
-- **database**: SQLite database interface with extensions (JSON1, FTS5, sqlite-vec)
+- **database**: libSQL database interface with support for both local and remote databases
 - **logger**: Structured logging utilities
 - **metrics**: Prometheus metrics collection
 - **tracing**: Distributed tracing support
 
 ## Database Package
 
-The `database` package provides a simple, idiomatic SQLite interface with built-in support for JSON1, FTS5, and sqlite-vec extensions. These extensions are always enabled for all database connections.
+The `database` package provides a simple, idiomatic libSQL interface. libSQL is a SQLite fork that's optimized for serverless and edge computing environments, maintaining API compatibility with SQLite.
 
 ### Features
 
 - Lightweight wrapper around the standard `database/sql` package
+- Support for both local file databases and remote libSQL databases (Turso)
 - Transaction support with easy-to-use Begin/Commit/Rollback methods
 - Connection pool configuration with sensible defaults
 - Context-based operations for proper timeout handling
-- SQLite extensions: JSON1, FTS5, and sqlite-vec enabled by default
 
 ### Usage
 
@@ -33,9 +33,13 @@ import (
 )
 
 func main() {
-    // Create a database with default configuration
+    // Create a database with default configuration (local in-memory database)
     cfg := database.DefaultConfig()
-    cfg.Path = "my-database.db" // Use a file instead of in-memory database
+    cfg.Path = "my-database.db" // Use a local file
+    
+    // For remote libSQL databases:
+    // cfg.Path = "libsql://my-db.turso.io"
+    // cfg.AuthToken = "your-auth-token"
 
     // Open connection to the database
     db, err := database.Open(cfg)
@@ -64,7 +68,7 @@ func main() {
         log.Fatalf("Failed to commit transaction: %v", err)
     }
 
-    // Using JSON capabilities (always enabled)
+    // Using JSON capabilities
     jsonQuery := `
     INSERT INTO users (name, metadata) 
     VALUES (?, json(?))
@@ -75,7 +79,7 @@ func main() {
         log.Fatalf("Failed to insert with JSON: %v", err)
     }
 
-    // Using FTS5 (Full-Text Search, always enabled)
+    // Using FTS5 (Full-Text Search)
     // Assuming you've set up FTS5 tables as shown in the example.go file
     rows, err := db.QueryContext(ctx, 
         "SELECT id, title FROM documents_fts WHERE documents_fts MATCH ?", 
@@ -96,16 +100,6 @@ func main() {
     }
 }
 ```
-
-### Building with SQLite Extensions
-
-When building your application, include the appropriate build tags to enable the required extensions:
-
-```bash
-go build -tags "fts5 json1" ./...
-```
-
-Note that since `mattn/go-sqlite3` is a CGO package, you'll need to ensure your build environment has a C compiler available.
 
 ## License
 

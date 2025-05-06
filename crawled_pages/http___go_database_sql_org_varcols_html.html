@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+        <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Working with Unknown Columns</title>
+    <link href="/css/bootstrap.min.css" rel="stylesheet">
+    <link href="/css/journal.min.css" rel="stylesheet">
+    <link href="/css/site.css" rel="stylesheet">
+		<link href="http://fonts.googleapis.com/css?family=Open+Sans:400italic,400,700" rel="stylesheet" type="text/css">
+
+    <link href="/css/prettify.css" type="text/css" rel="stylesheet" />
+    <script src="/js/prettify.js" type="text/javascript"></script>
+    <script src="/js/lang-go-rich.js" type="text/javascript"></script>
+  </head>
+  <body onload="prettyPrint()">
+    <div class="container">
+      <div class="row">
+        <div class="span3">
+          <div class="leftnav">
+  <ul class="nav nav-list">
+    
+      
+      <li class="nav-header ">
+        <a href="index.html">Go database/sql tutorial</a>
+      </li>
+    
+      
+      <li class=" ">
+        <a href="overview.html">Overview</a>
+      </li>
+    
+      
+      <li class=" ">
+        <a href="importing.html">Importing a Database Driver</a>
+      </li>
+    
+      
+      <li class=" ">
+        <a href="accessing.html">Accessing the Database</a>
+      </li>
+    
+      
+      <li class=" ">
+        <a href="retrieving.html">Retrieving Result Sets</a>
+      </li>
+    
+      
+      <li class=" ">
+        <a href="modifying.html">Modifying Data and Using Transactions</a>
+      </li>
+    
+      
+      <li class=" ">
+        <a href="prepared.html">Using Prepared Statements</a>
+      </li>
+    
+      
+      <li class=" ">
+        <a href="errors.html">Handling Errors</a>
+      </li>
+    
+      
+      <li class=" ">
+        <a href="nulls.html">Working with NULLs</a>
+      </li>
+    
+      
+      <li class=" active">
+        <a href="varcols.html">Working with Unknown Columns</a>
+      </li>
+    
+      
+      <li class=" ">
+        <a href="connection-pool.html">The Connection Pool</a>
+      </li>
+    
+      
+      <li class=" ">
+        <a href="surprises.html">Surprises, Antipatterns and Limitations</a>
+      </li>
+    
+      
+      <li class=" ">
+        <a href="references.html">Related Reading and Resources</a>
+      </li>
+    
+  </ul>
+  <hr />
+  <div class="license">
+    <a rel="license" href="http://creativecommons.org/licenses/by-sa/4.0/"><img alt="Creative Commons License" style="border-width:0" src="https://i.creativecommons.org/l/by-sa/4.0/80x15.png" /></a>
+  </div>
+</div>
+
+        </div>
+
+        <div class="span9">
+          <div class="page-header">
+            <h1>Working with Unknown Columns</h1>
+            <a href="https://github.com/VividCortex/go-database-sql-tutorial/edit/gh-pages/varcols.md" class="improve-page btn btn-info" target="_blank">Improve this page</a>
+          </div>
+          <p>The <code class="language-plaintext highlighter-rouge">Scan()</code> function requires you to pass exactly the right number of
+destination variables. What if you don’t know what the query will return?</p>
+
+<p>If you don’t know how many columns the query will return, you can use
+<code class="language-plaintext highlighter-rouge">Columns()</code> to find a list of column names. You can examine the length of this
+list to see how many columns there are, and you can pass a slice into <code class="language-plaintext highlighter-rouge">Scan()</code>
+with the correct number of values. For example, some forks of MySQL return
+different columns for the <code class="language-plaintext highlighter-rouge">SHOW PROCESSLIST</code> command, so you have to be prepared
+for that or you’ll cause an error. Here’s one way to do it; there are others:</p>
+
+<pre class="prettyprint lang-go">
+cols, err := rows.Columns()
+if err != nil {
+	// handle the error
+} else {
+	dest := []interface{}{ // Standard MySQL columns
+		new(uint64), // id
+		new(string), // host
+		new(string), // user
+		new(string), // db
+		new(string), // command
+		new(uint32), // time
+		new(string), // state
+		new(string), // info
+	}
+	if len(cols) == 11 {
+		// Percona Server
+	} else if len(cols) &gt; 8 {
+		// Handle this case
+	}
+	err = rows.Scan(dest...)
+	// Work with the values in dest
+}
+</pre>
+
+<p>If you don’t know the columns or their types, you should use <code class="language-plaintext highlighter-rouge">sql.RawBytes</code>.</p>
+
+<pre class="prettyprint lang-go">
+cols, err := rows.Columns() // Remember to check err afterwards
+vals := make([]interface{}, len(cols))
+for i, _ := range cols {
+	vals[i] = new(sql.RawBytes)
+}
+for rows.Next() {
+	err = rows.Scan(vals...)
+	// Now you can check each element of vals for nil-ness,
+	// and you can use type introspection and type assertions
+	// to fetch the column into a typed variable.
+}
+</pre>
+
+<p><strong>Previous: <a href="nulls.html">Working with NULLs</a></strong>
+<strong>Next: <a href="connection-pool.html">The Connection Pool</a></strong></p>
+
+        </div>
+      </div>
+    </div>
+  </body>
+</html>

@@ -58,7 +58,9 @@ check-sqlite:
 	@echo "Checking SQLite installation and extensions..."
 	@echo "SQLite version:"
 	@sqlite3 --version
-	@echo "\nAvailable SQLite extensions:"
+	@echo "\nAvailable SQLite compile options (for system SQLite):"
 	@echo "PRAGMA compile_options;" | sqlite3 | grep -E 'ENABLE_FTS5|ENABLE_JSON1'
+	@echo "\nNote: For the Go application, extensions like fts5, json1, and sqlite_vec are enabled via build tags ('fts5 json1 sqlite_vec')."
+	@echo "To verify sqlite-vec functions within a Go test or application, check for functions like 'vector_to_json' as done in database_test.go."
 	
 .PHONY: build test clean db-new db-migrate-up db-migrate-down db-migrate-version sqlc-generate check-sqlite

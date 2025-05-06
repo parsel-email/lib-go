@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+        <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Overview</title>
+    <link href="/css/bootstrap.min.css" rel="stylesheet">
+    <link href="/css/journal.min.css" rel="stylesheet">
+    <link href="/css/site.css" rel="stylesheet">
+		<link href="http://fonts.googleapis.com/css?family=Open+Sans:400italic,400,700" rel="stylesheet" type="text/css">
+
+    <link href="/css/prettify.css" type="text/css" rel="stylesheet" />
+    <script src="/js/prettify.js" type="text/javascript"></script>
+    <script src="/js/lang-go-rich.js" type="text/javascript"></script>
+  </head>
+  <body onload="prettyPrint()">
+    <div class="container">
+      <div class="row">
+        <div class="span3">
+          <div class="leftnav">
+  <ul class="nav nav-list">
+    
+      
+      <li class="nav-header ">
+        <a href="index.html">Go database/sql tutorial</a>
+      </li>
+    
+      
+      <li class=" active">
+        <a href="overview.html">Overview</a>
+      </li>
+    
+      
+      <li class=" ">
+        <a href="importing.html">Importing a Database Driver</a>
+      </li>
+    
+      
+      <li class=" ">
+        <a href="accessing.html">Accessing the Database</a>
+      </li>
+    
+      
+      <li class=" ">
+        <a href="retrieving.html">Retrieving Result Sets</a>
+      </li>
+    
+      
+      <li class=" ">
+        <a href="modifying.html">Modifying Data and Using Transactions</a>
+      </li>
+    
+      
+      <li class=" ">
+        <a href="prepared.html">Using Prepared Statements</a>
+      </li>
+    
+      
+      <li class=" ">
+        <a href="errors.html">Handling Errors</a>
+      </li>
+    
+      
+      <li class=" ">
+        <a href="nulls.html">Working with NULLs</a>
+      </li>
+    
+      
+      <li class=" ">
+        <a href="varcols.html">Working with Unknown Columns</a>
+      </li>
+    
+      
+      <li class=" ">
+        <a href="connection-pool.html">The Connection Pool</a>
+      </li>
+    
+      
+      <li class=" ">
+        <a href="surprises.html">Surprises, Antipatterns and Limitations</a>
+      </li>
+    
+      
+      <li class=" ">
+        <a href="references.html">Related Reading and Resources</a>
+      </li>
+    
+  </ul>
+  <hr />
+  <div class="license">
+    <a rel="license" href="http://creativecommons.org/licenses/by-sa/4.0/"><img alt="Creative Commons License" style="border-width:0" src="https://i.creativecommons.org/l/by-sa/4.0/80x15.png" /></a>
+  </div>
+</div>
+
+        </div>
+
+        <div class="span9">
+          <div class="page-header">
+            <h1>Overview</h1>
+            <a href="https://github.com/VividCortex/go-database-sql-tutorial/edit/gh-pages/overview.md" class="improve-page btn btn-info" target="_blank">Improve this page</a>
+          </div>
+          <p>To access databases in Go, you use a <code class="language-plaintext highlighter-rouge">sql.DB</code>. You use this type to create
+statements and transactions, execute queries, and fetch results.</p>
+
+<p>The first thing you should know is that <strong>a <code class="language-plaintext highlighter-rouge">sql.DB</code> isn’t a database
+connection</strong>. It also doesn’t map to any particular database software’s notion
+of a “database” or “schema.” It’s an abstraction of the interface and existence
+of a database, which might be as varied as a local file, accessed through a network
+connection, or in-memory and in-process.</p>
+
+<p><code class="language-plaintext highlighter-rouge">sql.DB</code> performs some important tasks for you behind the scenes:</p>
+
+<ul>
+  <li>It opens and closes connections to the actual underlying database, via the driver.</li>
+  <li>It manages a pool of connections as needed, which may be a variety of things as mentioned.</li>
+</ul>
+
+<p>The <code class="language-plaintext highlighter-rouge">sql.DB</code> abstraction is designed to keep you from worrying about how to
+manage concurrent access to the underlying datastore.  A connection is marked
+in-use when you use it to perform a task, and then returned to the available
+pool when it’s not in use anymore. One consequence of this is that <strong>if you fail
+to release connections back to the pool, you can cause <code class="language-plaintext highlighter-rouge">sql.DB</code> to open a lot of
+connections</strong>, potentially running out of resources (too many connections, too
+many open file handles, lack of available network ports, etc). We’ll discuss
+more about this later.</p>
+
+<p>After creating a <code class="language-plaintext highlighter-rouge">sql.DB</code>, you can use it to query the database that it
+represents, as well as creating statements and transactions.</p>
+
+<p><strong>Next: <a href="importing.html">Importing a Database Driver</a></strong></p>
+
+        </div>
+      </div>
+    </div>
+  </body>
+</html>

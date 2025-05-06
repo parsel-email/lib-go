@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+        <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Importing a Database Driver</title>
+    <link href="/css/bootstrap.min.css" rel="stylesheet">
+    <link href="/css/journal.min.css" rel="stylesheet">
+    <link href="/css/site.css" rel="stylesheet">
+		<link href="http://fonts.googleapis.com/css?family=Open+Sans:400italic,400,700" rel="stylesheet" type="text/css">
+
+    <link href="/css/prettify.css" type="text/css" rel="stylesheet" />
+    <script src="/js/prettify.js" type="text/javascript"></script>
+    <script src="/js/lang-go-rich.js" type="text/javascript"></script>
+  </head>
+  <body onload="prettyPrint()">
+    <div class="container">
+      <div class="row">
+        <div class="span3">
+          <div class="leftnav">
+  <ul class="nav nav-list">
+    
+      
+      <li class="nav-header ">
+        <a href="index.html">Go database/sql tutorial</a>
+      </li>
+    
+      
+      <li class=" ">
+        <a href="overview.html">Overview</a>
+      </li>
+    
+      
+      <li class=" active">
+        <a href="importing.html">Importing a Database Driver</a>
+      </li>
+    
+      
+      <li class=" ">
+        <a href="accessing.html">Accessing the Database</a>
+      </li>
+    
+      
+      <li class=" ">
+        <a href="retrieving.html">Retrieving Result Sets</a>
+      </li>
+    
+      
+      <li class=" ">
+        <a href="modifying.html">Modifying Data and Using Transactions</a>
+      </li>
+    
+      
+      <li class=" ">
+        <a href="prepared.html">Using Prepared Statements</a>
+      </li>
+    
+      
+      <li class=" ">
+        <a href="errors.html">Handling Errors</a>
+      </li>
+    
+      
+      <li class=" ">
+        <a href="nulls.html">Working with NULLs</a>
+      </li>
+    
+      
+      <li class=" ">
+        <a href="varcols.html">Working with Unknown Columns</a>
+      </li>
+    
+      
+      <li class=" ">
+        <a href="connection-pool.html">The Connection Pool</a>
+      </li>
+    
+      
+      <li class=" ">
+        <a href="surprises.html">Surprises, Antipatterns and Limitations</a>
+      </li>
+    
+      
+      <li class=" ">
+        <a href="references.html">Related Reading and Resources</a>
+      </li>
+    
+  </ul>
+  <hr />
+  <div class="license">
+    <a rel="license" href="http://creativecommons.org/licenses/by-sa/4.0/"><img alt="Creative Commons License" style="border-width:0" src="https://i.creativecommons.org/l/by-sa/4.0/80x15.png" /></a>
+  </div>
+</div>
+
+        </div>
+
+        <div class="span9">
+          <div class="page-header">
+            <h1>Importing a Database Driver</h1>
+            <a href="https://github.com/VividCortex/go-database-sql-tutorial/edit/gh-pages/importing.md" class="improve-page btn btn-info" target="_blank">Improve this page</a>
+          </div>
+          <p>To use <code class="language-plaintext highlighter-rouge">database/sql</code> you’ll need the package itself, as well as a driver for
+the specific database you want to use.</p>
+
+<p>You generally shouldn’t use driver packages directly, although some drivers
+encourage you to do so. (In our opinion, it’s usually a bad idea.) Instead, your
+code should only refer to types defined in <code class="language-plaintext highlighter-rouge">database/sql</code>, if possible. This
+helps avoid making your code dependent on the driver, so that you can change the
+underlying driver (and thus the database you’re accessing) with minimal code
+changes. It also forces you to use the Go idioms instead of ad-hoc idioms that a
+particular driver author may have provided.</p>
+
+<p>In this documentation, we’ll use the excellent <a href="https://github.com/go-sql-driver/mysql">MySQL
+drivers</a> from @julienschmidt and @arnehormann
+ for examples.</p>
+
+<p>Add the following to the top of your Go source file:</p>
+
+<pre class="prettyprint lang-go">
+import (
+	"database/sql"
+	_ "github.com/go-sql-driver/mysql"
+)
+</pre>
+
+<p>Notice that we’re loading the driver anonymously, aliasing its package qualifier
+to <code class="language-plaintext highlighter-rouge">_</code> so none of its exported names are visible to our code. Under the hood,
+the driver registers itself as being available to the <code class="language-plaintext highlighter-rouge">database/sql</code> package,
+but in general nothing else happens with the exception that the init function is run.</p>
+
+<p>Now you’re ready to access a database.</p>
+
+<p><strong>Previous: <a href="overview.html">Overview of Go’s database/sql Package</a></strong>
+<strong>Next: <a href="accessing.html">Accessing the Database</a></strong></p>
+
+        </div>
+      </div>
+    </div>
+  </body>
+</html>

@@ -9,12 +9,13 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/golang-migrate/migrate/v4"
 	"github.com/golang-migrate/migrate/v4/database/sqlite"
 	_ "github.com/golang-migrate/migrate/v4/source/file"
-	_ "github.com/mattn/go-sqlite3"
+	"github.com/tursodatabase/libsql-client-go/libsql"
 )
 
 const migrationsDir = "./db/migrations"
@@ -84,7 +85,7 @@ func getDBPath() string {
 func runMigration(migrateFn func(*migrate.Migrate) error) {
 	dbPath := getDBPath()
 
-	// Connect to SQLite database
+	// Connect to database
 	db, err := sqlite.WithInstance(openDB(dbPath), &sqlite.Config{})
 	if err != nil {
 		log.Fatalf("Failed to connect to database: %v", err)
@@ -115,7 +116,7 @@ func runMigration(migrateFn func(*migrate.Migrate) error) {
 func getMigrationVersion() {
 	dbPath := getDBPath()
 
-	// Connect to SQLite database
+	// Connect to database
 	db, err := sqlite.WithInstance(openDB(dbPath), &sqlite.Config{})
 	if err != nil {
 		log.Fatalf("Failed to connect to database: %v", err)
@@ -142,8 +143,31 @@ func getMigrationVersion() {
 
 	fmt.Printf("Current migration version: %d (dirty: %v)\n", version, dirty)
 }
+
 func openDB(dbPath string) *sql.DB {
-	db, err := sql.Open("sqlite3", dbPath)
+	// Check if this is a libSQL URL or a local file
+	var db *sql.DB
+	var err error
+
+	if strings.HasPrefix(dbPath, "libsql://") {
+		// For remote libSQL URLs
+
+		connOpts := []libsql.Option{}
+
+		connector, err := libsql.NewConnector(dbPath, connOpts...)
+		if err != nil {
+			log.Fatalf("Failed to create libSQL connector: %v", err)
+		}
+		db = sql.OpenDB(connector)
+	} else {
+		// For local files
+		connector, err := libsql.NewConnector(dbPath, nil)
+		if err != nil {
+			log.Fatalf("Failed to create libSQL connector: %v", err)
+		}
+		db = sql.OpenDB(connector)
+	}
+
 	if err != nil {
 		log.Fatalf("Failed to open database: %v", err)
 	}

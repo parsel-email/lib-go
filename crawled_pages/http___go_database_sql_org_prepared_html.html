@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+        <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Using Prepared Statements</title>
+    <link href="/css/bootstrap.min.css" rel="stylesheet">
+    <link href="/css/journal.min.css" rel="stylesheet">
+    <link href="/css/site.css" rel="stylesheet">
+		<link href="http://fonts.googleapis.com/css?family=Open+Sans:400italic,400,700" rel="stylesheet" type="text/css">
+
+    <link href="/css/prettify.css" type="text/css" rel="stylesheet" />
+    <script src="/js/prettify.js" type="text/javascript"></script>
+    <script src="/js/lang-go-rich.js" type="text/javascript"></script>
+  </head>
+  <body onload="prettyPrint()">
+    <div class="container">
+      <div class="row">
+        <div class="span3">
+          <div class="leftnav">
+  <ul class="nav nav-list">
+    
+      
+      <li class="nav-header ">
+        <a href="index.html">Go database/sql tutorial</a>
+      </li>
+    
+      
+      <li class=" ">
+        <a href="overview.html">Overview</a>
+      </li>
+    
+      
+      <li class=" ">
+        <a href="importing.html">Importing a Database Driver</a>
+      </li>
+    
+      
+      <li class=" ">
+        <a href="accessing.html">Accessing the Database</a>
+      </li>
+    
+      
+      <li class=" ">
+        <a href="retrieving.html">Retrieving Result Sets</a>
+      </li>
+    
+      
+      <li class=" ">
+        <a href="modifying.html">Modifying Data and Using Transactions</a>
+      </li>
+    
+      
+      <li class=" active">
+        <a href="prepared.html">Using Prepared Statements</a>
+      </li>
+    
+      
+      <li class=" ">
+        <a href="errors.html">Handling Errors</a>
+      </li>
+    
+      
+      <li class=" ">
+        <a href="nulls.html">Working with NULLs</a>
+      </li>
+    
+      
+      <li class=" ">
+        <a href="varcols.html">Working with Unknown Columns</a>
+      </li>
+    
+      
+      <li class=" ">
+        <a href="connection-pool.html">The Connection Pool</a>
+      </li>
+    
+      
+      <li class=" ">
+        <a href="surprises.html">Surprises, Antipatterns and Limitations</a>
+      </li>
+    
+      
+      <li class=" ">
+        <a href="references.html">Related Reading and Resources</a>
+      </li>
+    
+  </ul>
+  <hr />
+  <div class="license">
+    <a rel="license" href="http://creativecommons.org/licenses/by-sa/4.0/"><img alt="Creative Commons License" style="border-width:0" src="https://i.creativecommons.org/l/by-sa/4.0/80x15.png" /></a>
+  </div>
+</div>
+
+        </div>
+
+        <div class="span9">
+          <div class="page-header">
+            <h1>Using Prepared Statements</h1>
+            <a href="https://github.com/VividCortex/go-database-sql-tutorial/edit/gh-pages/prepared.md" class="improve-page btn btn-info" target="_blank">Improve this page</a>
+          </div>
+          <p>Prepared statements have all the usual benefits in Go: security, efficiency,
+convenience. But the way they’re implemented is a little different from what
+you might be used to, especially with regards to how they interact with some of
+the internals of <code class="language-plaintext highlighter-rouge">database/sql</code>.</p>
+
+<h1 id="prepared-statements-and-connections">Prepared Statements And Connections</h1>
+
+<p>At the database level, a prepared statement is bound to a single database
+connection. The typical flow is that the client sends a SQL statement with
+placeholders to the server for preparation, the server responds with a statement
+ID, and then the client executes the statement by sending its ID and parameters.</p>
+
+<p>In Go, however, connections are not exposed directly to the user of the
+<code class="language-plaintext highlighter-rouge">database/sql</code> package. You don’t prepare a statement on a connection. You
+prepare it on a <code class="language-plaintext highlighter-rouge">DB</code> or a <code class="language-plaintext highlighter-rouge">Tx</code>. And <code class="language-plaintext highlighter-rouge">database/sql</code> has some convenience
+behaviors such as automatic retries. For these reasons, the underlying
+association between prepared statements and connections, which exists at the
+driver level, is hidden from your code.</p>
+
+<p>Here’s how it works:</p>
+
+<ol>
+  <li>When you prepare a statement, it’s prepared on a connection in the pool.</li>
+  <li>The <code class="language-plaintext highlighter-rouge">Stmt</code> object remembers which connection was used.</li>
+  <li>When you execute the <code class="language-plaintext highlighter-rouge">Stmt</code>, it tries to use the connection. If it’s not
+ available because it’s closed or busy doing something else, it gets another
+ connection from the pool <em>and re-prepares the statement with the database on
+ another connection.</em></li>
+</ol>
+
+<p>Because statements will be re-prepared as needed when their original connection
+is busy, it’s possible for high-concurrency usage of the database, which may
+keep a lot of connections busy, to create a large number of prepared statements.
+This can result in apparent leaks of statements, statements being prepared and
+re-prepared more often than you think, and even running into server-side limits
+on the number of statements.</p>
+
+<h1 id="avoiding-prepared-statements">Avoiding Prepared Statements</h1>
+
+<p>Go creates prepared statements for you under the covers. A simple
+<code class="language-plaintext highlighter-rouge">db.Query(sql, param1, param2)</code>, for example, works by preparing the sql, then
+executing it with the parameters and finally closing the statement.</p>
+
+<p>Sometimes a prepared statement is not what you want, however. There might be
+several reasons for this:</p>
+
+<ol>
+  <li>The database doesn’t support prepared statements. When using the MySQL
+ driver, for example, you can connect to MemSQL and Sphinx, because they
+ support the MySQL wire protocol. But they don’t support the “binary” protocol
+ that includes prepared statements, so they can fail in confusing ways.</li>
+  <li>The statements aren’t reused enough to make them worthwhile, and security
+ issues are handled in other ways, so performance overhead is undesired. An
+ example of this can be seen at the
+ <a href="https://vividcortex.com/blog/2014/11/19/analyzing-prepared-statement-performance-with-vividcortex/">VividCortex blog</a>.</li>
+</ol>
+
+<p>If you don’t want to use a prepared statement, you need to use <code class="language-plaintext highlighter-rouge">fmt.Sprint()</code> or
+similar to assemble the SQL, and pass this as the only argument to <code class="language-plaintext highlighter-rouge">db.Query()</code>
+or <code class="language-plaintext highlighter-rouge">db.QueryRow()</code>. And your driver needs to support plaintext query execution,
+which is added in Go 1.1 via the <code class="language-plaintext highlighter-rouge">Execer</code> and <code class="language-plaintext highlighter-rouge">Queryer</code> interfaces,
+<a href="http://golang.org/pkg/database/sql/driver/#Execer">documented here</a>.</p>
+
+<h1 id="prepared-statements-in-transactions">Prepared Statements in Transactions</h1>
+
+<p>Prepared statements that are created in a <code class="language-plaintext highlighter-rouge">Tx</code> are bound exclusively to
+it, so the earlier cautions about repreparing do not apply. When
+you operate on a <code class="language-plaintext highlighter-rouge">Tx</code> object, your actions map directly to the one and only one
+connection underlying it.</p>
+
+<p>This also means that prepared statements created inside a <code class="language-plaintext highlighter-rouge">Tx</code> can’t be used
+separately from it. Likewise, prepared statements created on a <code class="language-plaintext highlighter-rouge">DB</code> can’t be
+used within a transaction, because they will be bound to a different connection.</p>
+
+<p>To use a prepared statement prepared outside the transaction in a <code class="language-plaintext highlighter-rouge">Tx</code>, you can use
+<code class="language-plaintext highlighter-rouge">Tx.Stmt()</code>, which will create a new transaction-specific statement from the one
+prepared outside the transaction. It does this by taking an existing prepared statement,
+setting the connection to that of the transaction and repreparing all statements every
+time they are executed. This behavior and its implementation are undesirable and there’s
+even a TODO in the <code class="language-plaintext highlighter-rouge">database/sql</code> source code to improve it; we advise against using this.</p>
+
+<p>Caution must be exercised when working with prepared statements in
+transactions. Consider the following example:</p>
+
+<pre class="prettyprint lang-go">
+tx, err := db.Begin()
+if err != nil {
+	log.Fatal(err)
+}
+defer tx.Rollback()
+stmt, err := tx.Prepare("INSERT INTO foo VALUES (?)")
+if err != nil {
+	log.Fatal(err)
+}
+defer stmt.Close() // danger!
+for i := 0; i &lt; 10; i++ {
+	_, err = stmt.Exec(i)
+	if err != nil {
+		log.Fatal(err)
+	}
+}
+err = tx.Commit()
+if err != nil {
+	log.Fatal(err)
+}
+// stmt.Close() runs here!
+</pre>
+
+<p>Before Go 1.4 closing a <code class="language-plaintext highlighter-rouge">*sql.Tx</code> released the connection associated with it back into the
+pool, but the deferred call to Close on the prepared statement was executed
+<strong>after</strong> that has happened, which could lead to concurrent access to the
+underlying connection, rendering the connection state inconsistent.
+If you use Go 1.4 or older, you should make sure the statement is always closed before the transaction is
+committed or rolled back. <a href="https://github.com/golang/go/issues/4459">This issue</a> was fixed in Go 1.4 by <a href="https://codereview.appspot.com/131650043">CR 131650043</a>.</p>
+
+<h1 id="parameter-placeholder-syntax">Parameter Placeholder Syntax</h1>
+
+<p>The syntax for placeholder parameters in prepared statements is
+database-specific. For example, comparing MySQL, PostgreSQL, and Oracle:</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>MySQL               PostgreSQL            Oracle
+=====               ==========            ======
+WHERE col = ?       WHERE col = $1        WHERE col = :col
+VALUES(?, ?, ?)     VALUES($1, $2, $3)    VALUES(:val1, :val2, :val3)
+</code></pre></div></div>
+
+<p><strong>Previous: <a href="modifying.html">Modifying Data and Using Transactions</a></strong>
+<strong>Next: <a href="errors.html">Handling Errors</a></strong></p>
+
+        </div>
+      </div>
+    </div>
+  </body>
+</html>
