@@ -47,30 +47,35 @@ func Open(cfg Config) (*DB, error) {
 	// Check if the connection string is for a remote database or local file
 	if strings.HasPrefix(cfg.Path, "libsql://") {
 		// Configure for remote libSQL database
-		connOpts := []libsql.Option{
-			libsql.WithAuthToken(cfg.AuthToken),
+		connOpts := []libsql.Option{}
+
+		// Add auth token if provided
+		if cfg.AuthToken != "" {
+			connOpts = append(connOpts, libsql.WithAuthToken(cfg.AuthToken))
 		}
 
 		// Create a connector for the remote database
 		connector, err := libsql.NewConnector(cfg.Path, connOpts...)
 		if err != nil {
-			return nil, fmt.Errorf("creating libSQL connector: %w", err)
+			return nil, fmt.Errorf("creating libSQL connector for remote database: %w", err)
 		}
 
 		// Open the database with the connector
 		db = sql.OpenDB(connector)
 	} else {
-		// For local file or in-memory database, use a direct connection
+		// For local file or in-memory database
 		dsn := formatDSN(cfg.Path, cfg.Pragmas)
 
-		// Create a connector for the local database
+		// Open the database with the libSQL connector
 		connector, err := libsql.NewConnector(dsn, nil)
 		if err != nil {
-			return nil, fmt.Errorf("creating libSQL connector: %w", err)
+			return nil, fmt.Errorf("creating libSQL connector for local database: %w", err)
 		}
-
-		// Open the database with the connector
 		db = sql.OpenDB(connector)
+	}
+
+	if db == nil {
+		return nil, fmt.Errorf("failed to create a database connection")
 	}
 
 	// Configure connection pool
@@ -81,6 +86,7 @@ func Open(cfg Config) (*DB, error) {
 
 	// Test connection
 	if err := db.Ping(); err != nil {
+		db.Close() // Close the failed connection
 		return nil, fmt.Errorf("pinging database: %w", err)
 	}
 
