@@ -1,5 +1,5 @@
-// Package database provides a simple libSQL interface with extensions
-package database
+// Package libsql provides a simple libSQL interface with extensions
+package libsql
 
 import (
 	"context"

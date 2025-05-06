@@ -1,4 +1,4 @@
-package database_test
+package libsql
 
 import (
 	"context"
@@ -8,23 +8,21 @@ import (
 	"strings"
 	"testing"
 	"time"
-
-	"github.com/parsel-email/lib-go/database"
 )
 
 func TestDatabaseBasic(t *testing.T) {
 	// Use in-memory database for testing
-	cfg := database.DefaultConfig()
+	cfg := DefaultConfig()
 
 	// Open connection to the database
-	db, err := database.Open(cfg)
+	db, err := Open(cfg)
 	if err != nil {
 		t.Fatalf("Failed to open database: %v", err)
 	}
 	defer db.Close()
 
 	// Create a context with timeout
-	ctx, cancel := database.WithContext(context.Background(), 5*time.Second)
+	ctx, cancel := WithContext(context.Background(), 5*time.Second)
 	defer cancel()
 
 	// Test basic query
@@ -53,17 +51,17 @@ func TestDatabaseBasic(t *testing.T) {
 
 func TestTransaction(t *testing.T) {
 	// Use in-memory database for testing
-	cfg := database.DefaultConfig()
+	cfg := DefaultConfig()
 
 	// Open connection to the database
-	db, err := database.Open(cfg)
+	db, err := Open(cfg)
 	if err != nil {
 		t.Fatalf("Failed to open database: %v", err)
 	}
 	defer db.Close()
 
 	// Create a context with timeout
-	ctx, cancel := database.WithContext(context.Background(), 5*time.Second)
+	ctx, cancel := WithContext(context.Background(), 5*time.Second)
 	defer cancel()
 
 	// Create table for transaction test
@@ -125,17 +123,17 @@ func TestTransaction(t *testing.T) {
 
 func TestJSONExtension(t *testing.T) {
 	// Use in-memory database for testing
-	cfg := database.DefaultConfig()
+	cfg := DefaultConfig()
 
 	// Open connection to the database
-	db, err := database.Open(cfg)
+	db, err := Open(cfg)
 	if err != nil {
 		t.Fatalf("Failed to open database: %v", err)
 	}
 	defer db.Close()
 
 	// Create a context with timeout
-	ctx, cancel := database.WithContext(context.Background(), 5*time.Second)
+	ctx, cancel := WithContext(context.Background(), 5*time.Second)
 	defer cancel()
 
 	// Create table with JSON column
@@ -181,17 +179,17 @@ func TestJSONExtension(t *testing.T) {
 
 func TestFTS5Extension(t *testing.T) {
 	// Use in-memory database for testing
-	cfg := database.DefaultConfig()
+	cfg := DefaultConfig()
 
 	// Open connection to the database
-	db, err := database.Open(cfg)
+	db, err := Open(cfg)
 	if err != nil {
 		t.Fatalf("Failed to open database: %v", err)
 	}
 	defer db.Close()
 
 	// Create a context with timeout
-	ctx, cancel := database.WithContext(context.Background(), 5*time.Second)
+	ctx, cancel := WithContext(context.Background(), 5*time.Second)
 	defer cancel()
 
 	// Create tables for FTS5 test - splitting into separate statements
@@ -276,17 +274,17 @@ func TestFTS5Extension(t *testing.T) {
 
 func TestLibSQLVectorSupport(t *testing.T) {
 	// Use in-memory database for testing
-	cfg := database.DefaultConfig()
+	cfg := DefaultConfig()
 
 	// Open connection to the database
-	db, err := database.Open(cfg)
+	db, err := Open(cfg)
 	if err != nil {
 		t.Fatalf("Failed to open database: %v", err)
 	}
 	defer db.Close()
 
 	// Create a context with timeout
-	ctx, cancel := database.WithContext(context.Background(), 5*time.Second)
+	ctx, cancel := WithContext(context.Background(), 5*time.Second)
 	defer cancel()
 
 	// Create table with vector column using F32_BLOB datatype for vectors
@@ -422,11 +420,11 @@ func TestFileDatabasePersistence(t *testing.T) {
 	defer os.Remove(dbFile)
 
 	// Create configuration with file path
-	cfg := database.DefaultConfig()
+	cfg := DefaultConfig()
 	cfg.Path = dbFile
 
 	// First connection - create data
-	db1, err := database.Open(cfg)
+	db1, err := Open(cfg)
 	if err != nil {
 		t.Fatalf("Failed to open first database connection: %v", err)
 	}
@@ -448,7 +446,7 @@ func TestFileDatabasePersistence(t *testing.T) {
 	}
 
 	// Second connection - verify data persists
-	db2, err := database.Open(cfg)
+	db2, err := Open(cfg)
 	if err != nil {
 		t.Fatalf("Failed to open second database connection: %v", err)
 	}
@@ -467,7 +465,7 @@ func TestFileDatabasePersistence(t *testing.T) {
 
 func TestConnectionPool(t *testing.T) {
 	// Configure connection pool settings
-	cfg := database.DefaultConfig()
+	cfg := DefaultConfig()
 	cfg.MaxOpenConns = 10
 	cfg.MaxIdleConns = 5
 	cfg.ConnMaxLifetime = 30 * time.Minute
@@ -480,7 +478,7 @@ func TestConnectionPool(t *testing.T) {
 	cfg.Path = dbFile
 
 	// Set pragmas to better handle concurrent operations
-	cfg.Pragmas = database.Pragmas{
+	cfg.Pragmas = Pragmas{
 		"journal_mode": "WAL",       // Write-Ahead Logging for better concurrency
 		"synchronous":  "NORMAL",    // Good balance between safety and performance
 		"busy_timeout": "5000",      // Wait up to 5 seconds for locks to clear
@@ -491,7 +489,7 @@ func TestConnectionPool(t *testing.T) {
 	}
 
 	// Open connection to the database
-	db, err := database.Open(cfg)
+	db, err := Open(cfg)
 	if err != nil {
 		t.Fatalf("Failed to open database: %v", err)
 	}
@@ -516,10 +514,10 @@ func TestConnectionPool(t *testing.T) {
 			time.Sleep(time.Duration(10+rand.Intn(20)) * time.Millisecond)
 
 			// Create a context with timeout
-			ctx, cancel := database.WithContext(context.Background(), 5*time.Second)
+			ctx, cancel := WithContext(context.Background(), 5*time.Second)
 
 			// Begin transaction with retry
-			var tx *database.Transaction
+			var tx *Transaction
 			var err error
 
 			// Try up to 3 times to begin a transaction
@@ -637,10 +635,10 @@ func TestConnectionPool(t *testing.T) {
 
 func TestContextTimeout(t *testing.T) {
 	// Use in-memory database for testing
-	cfg := database.DefaultConfig()
+	cfg := DefaultConfig()
 
 	// Open connection to the database
-	db, err := database.Open(cfg)
+	db, err := Open(cfg)
 	if err != nil {
 		t.Fatalf("Failed to open database: %v", err)
 	}
@@ -661,7 +659,7 @@ func TestContextTimeout(t *testing.T) {
 	}
 
 	// Test with a very short timeout
-	ctx, cancel := database.WithContext(context.Background(), 1*time.Nanosecond)
+	ctx, cancel := WithContext(context.Background(), 1*time.Nanosecond)
 	defer cancel()
 
 	// This query should timeout
