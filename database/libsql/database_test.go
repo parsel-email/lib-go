@@ -2,6 +2,7 @@ package libsql
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"math/rand"
 	"os"
@@ -71,7 +72,7 @@ func TestTransaction(t *testing.T) {
 	}
 
 	// Test successful transaction
-	tx, err := db.BeginTx(ctx)
+	tx, err := db.BeginTx(ctx, nil)
 	if err != nil {
 		t.Fatalf("Failed to begin transaction: %v", err)
 	}
@@ -86,7 +87,7 @@ func TestTransaction(t *testing.T) {
 	}
 
 	// Test rollback transaction
-	tx, err = db.BeginTx(ctx)
+	tx, err = db.BeginTx(ctx, nil)
 	if err != nil {
 		t.Fatalf("Failed to begin transaction: %v", err)
 	}
@@ -517,12 +518,12 @@ func TestConnectionPool(t *testing.T) {
 			ctx, cancel := WithContext(context.Background(), 5*time.Second)
 
 			// Begin transaction with retry
-			var tx *Transaction
+			var tx *sql.Tx
 			var err error
 
 			// Try up to 3 times to begin a transaction
 			for attempt := 0; attempt < 3; attempt++ {
-				tx, err = db.BeginTx(ctx)
+				tx, err = db.BeginTx(ctx, nil)
 				if err == nil {
 					break
 				}

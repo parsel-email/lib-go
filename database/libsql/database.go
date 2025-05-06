@@ -11,11 +11,6 @@ import (
 	_ "github.com/tursodatabase/go-libsql"
 )
 
-// DB represents a database connection
-type DB struct {
-	*sql.DB
-}
-
 // Config holds database configuration
 type Config struct {
 	Path            string
@@ -41,7 +36,7 @@ func DefaultConfig() Config {
 }
 
 // Open creates a new database connection with libSQL
-func Open(cfg Config) (*DB, error) {
+func Open(cfg Config) (*sql.DB, error) {
 	var db *sql.DB
 
 	// Check if the connection string is for a remote database or local file
@@ -74,7 +69,7 @@ func Open(cfg Config) (*DB, error) {
 		return nil, fmt.Errorf("pinging database: %w", err)
 	}
 
-	return &DB{DB: db}, nil
+	return db, nil
 }
 
 // WithContext returns a context with timeout for database operations
@@ -83,42 +78,4 @@ func WithContext(ctx context.Context, timeout time.Duration) (context.Context, c
 		return context.WithTimeout(ctx, timeout)
 	}
 	return ctx, func() {}
-}
-
-// Transaction represents a database transaction
-type Transaction struct {
-	*sql.Tx
-}
-
-// BeginTx starts a new transaction
-func (db *DB) BeginTx(ctx context.Context) (*Transaction, error) {
-	tx, err := db.DB.BeginTx(ctx, nil)
-	if err != nil {
-		return nil, fmt.Errorf("beginning transaction: %w", err)
-	}
-	return &Transaction{Tx: tx}, nil
-}
-
-// Commit commits the transaction
-func (tx *Transaction) Commit() error {
-	if err := tx.Tx.Commit(); err != nil {
-		return fmt.Errorf("committing transaction: %w", err)
-	}
-	return nil
-}
-
-// Rollback rolls back the transaction
-func (tx *Transaction) Rollback() error {
-	if err := tx.Tx.Rollback(); err != nil {
-		return fmt.Errorf("rolling back transaction: %w", err)
-	}
-	return nil
-}
-
-// Close closes the database connection
-func (db *DB) Close() error {
-	if err := db.DB.Close(); err != nil {
-		return fmt.Errorf("closing database: %w", err)
-	}
-	return nil
 }
