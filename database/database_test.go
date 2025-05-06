@@ -233,7 +233,7 @@ func TestFTS5Extension(t *testing.T) {
 
 	// Test FTS5 search
 	rows, err := db.QueryContext(ctx,
-		"SELECT id, title FROM documents_fts WHERE documents_fts MATCH ? ORDER BY rank",
+		"SELECT rowid, title FROM documents_fts WHERE documents_fts MATCH ? ORDER BY rank",
 		"sqlite")
 	if err != nil {
 		t.Fatalf("Failed to search with FTS5: %v", err)
