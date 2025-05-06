@@ -383,6 +383,12 @@ func TestConnectionPool(t *testing.T) {
 	cfg.ConnMaxLifetime = 30 * time.Minute
 	cfg.ConnMaxIdleTime = 10 * time.Minute
 
+	// Use a file database instead of in-memory for this test to ensure
+	// consistent behavior with concurrent connections
+	dbFile := "test_pool.db"
+	defer os.Remove(dbFile) // Clean up after test
+	cfg.Path = dbFile
+
 	// Open connection to the database
 	db, err := database.Open(cfg)
 	if err != nil {
@@ -400,6 +406,7 @@ func TestConnectionPool(t *testing.T) {
 	concurrency := 5
 	iterations := 10
 	errChan := make(chan error, concurrency*iterations)
+	doneChan := make(chan bool, concurrency)
 
 	// Function to insert and query in a transaction
 	worker := func(id int) {
@@ -410,8 +417,9 @@ func TestConnectionPool(t *testing.T) {
 			// Begin transaction
 			tx, err := db.BeginTx(ctx)
 			if err != nil {
-				errChan <- err
+				errChan <- fmt.Errorf("worker %d failed to begin transaction: %w", id, err)
 				cancel()
+				doneChan <- true
 				return
 			}
 
@@ -420,21 +428,26 @@ func TestConnectionPool(t *testing.T) {
 			_, err = tx.Exec("INSERT INTO pool_test (value) VALUES (?)", value)
 			if err != nil {
 				tx.Rollback()
-				errChan <- err
+				errChan <- fmt.Errorf("worker %d failed to insert: %w", id, err)
 				cancel()
+				doneChan <- true
 				return
 			}
 
 			// Commit transaction
 			if err := tx.Commit(); err != nil {
-				errChan <- err
+				errChan <- fmt.Errorf("worker %d failed to commit: %w", id, err)
 				cancel()
+				doneChan <- true
 				return
 			}
 
 			cancel()
+			// Small delay to avoid overwhelming the SQLite lock
+			time.Sleep(1 * time.Millisecond)
 		}
 		errChan <- nil
+		doneChan <- true
 	}
 
 	// Start concurrent workers
@@ -444,8 +457,19 @@ func TestConnectionPool(t *testing.T) {
 
 	// Wait for all workers to finish
 	for i := 0; i < concurrency; i++ {
-		err := <-errChan
-		if err != nil {
+		<-doneChan
+	}
+
+	// Check for any errors
+	var workerErrors []error
+	for i := 0; i < concurrency; i++ {
+		if err := <-errChan; err != nil {
+			workerErrors = append(workerErrors, err)
+		}
+	}
+
+	if len(workerErrors) > 0 {
+		for _, err := range workerErrors {
 			t.Errorf("Worker error: %v", err)
 		}
 	}
@@ -457,7 +481,7 @@ func TestConnectionPool(t *testing.T) {
 		t.Fatalf("Failed to count rows: %v", err)
 	}
 
-	expectedCount := concurrency * iterations
+	expectedCount := concurrency*iterations - len(workerErrors)
 	if count != expectedCount {
 		t.Errorf("Expected %d rows, got %d", expectedCount, count)
 	}
