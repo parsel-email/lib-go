@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	sqlite_vec "github.com/asg017/sqlite-vec-go-bindings/cgo"
+	// sqlite_vec "github.com/asg017/sqlite-vec-go-bindings/cgo"
 	_ "github.com/knaka/go-sqlite3-fts5"
 	_ "github.com/mattn/go-sqlite3"
 )
@@ -59,7 +59,7 @@ func Open(cfg Config) (*sql.DB, error) {
 		dsn += "?_fts5=1&_json=1"
 	}
 
-	sqlite_vec.Auto()
+	// sqlite_vec.Auto()
 	db, err := sql.Open("sqlite3", dsn)
 	if err != nil {
 		return nil, fmt.Errorf("opening database: %w", err)

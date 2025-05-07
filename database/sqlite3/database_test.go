@@ -9,8 +9,7 @@ import (
 	"strings"
 	"testing"
 	"time"
-
-	sqlite_vec "github.com/asg017/sqlite-vec-go-bindings/cgo"
+	// sqlite_vec "github.com/asg017/sqlite-vec-go-bindings/cgo"
 )
 
 func TestDatabaseBasic(t *testing.T) {
@@ -275,83 +274,83 @@ func TestFTS5Extension(t *testing.T) {
 	}
 }
 
-func TestSQLiteLVectorSupport(t *testing.T) {
-	// Use in-memory database for testing
-	cfg := DefaultConfig()
+// func TestSQLiteLVectorSupport(t *testing.T) {
+// 	// Use in-memory database for testing
+// 	cfg := DefaultConfig()
 
-	// Open connection to the database
-	db, err := Open(cfg)
-	if err != nil {
-		t.Fatalf("Failed to open database: %v", err)
-	}
-	defer db.Close()
+// 	// Open connection to the database
+// 	db, err := Open(cfg)
+// 	if err != nil {
+// 		t.Fatalf("Failed to open database: %v", err)
+// 	}
+// 	defer db.Close()
 
-	// Create a context with timeout
-	ctx, cancel := WithContext(context.Background(), 5*time.Second)
-	defer cancel()
+// 	// Create a context with timeout
+// 	ctx, cancel := WithContext(context.Background(), 5*time.Second)
+// 	defer cancel()
 
-	// Create table with vector column using BLOB datatype for vectors
-	_, err = db.ExecContext(ctx, `
-		CREATE TABLE vector_test (
-			id INTEGER PRIMARY KEY,
-			embedding BLOB  -- Store vectors as BLOB
-		)
-	`)
-	if err != nil {
-		t.Fatalf("Failed to create vector table: %v", err)
-	}
+// 	// Create table with vector column using BLOB datatype for vectors
+// 	_, err = db.ExecContext(ctx, `
+// 		CREATE TABLE vector_test (
+// 			id INTEGER PRIMARY KEY,
+// 			embedding BLOB  -- Store vectors as BLOB
+// 		)
+// 	`)
+// 	if err != nil {
+// 		t.Fatalf("Failed to create vector table: %v", err)
+// 	}
 
-	// Prepare test vectors
-	testVectors := [][]float32{
-		{0.800, 0.579, 0.481, 0.229},
-		{0.406, 0.027, 0.378, 0.056},
-		{0.698, 0.140, 0.073, 0.125},
-		{0.379, 0.637, 0.011, 0.647},
-	}
+// 	// Prepare test vectors
+// 	testVectors := [][]float32{
+// 		{0.800, 0.579, 0.481, 0.229},
+// 		{0.406, 0.027, 0.378, 0.056},
+// 		{0.698, 0.140, 0.073, 0.125},
+// 		{0.379, 0.637, 0.011, 0.647},
+// 	}
 
-	// Insert vectors using sqlite_vec serialization
-	for i, vec := range testVectors {
-		// Serialize the float32 vector
-		serialized, err := sqlite_vec.SerializeFloat32(vec)
-		if err != nil {
-			t.Fatalf("Failed to serialize vector: %v", err)
-		}
+// 	// Insert vectors using sqlite_vec serialization
+// 	for i, vec := range testVectors {
+// 		// Serialize the float32 vector
+// 		serialized, err := sqlite_vec.SerializeFloat32(vec)
+// 		if err != nil {
+// 			t.Fatalf("Failed to serialize vector: %v", err)
+// 		}
 
-		// Insert the serialized vector
-		_, err = db.ExecContext(ctx, "INSERT INTO vector_test (id, embedding) VALUES (?, ?)", i+1, serialized)
-		if err != nil {
-			t.Fatalf("Failed to insert vector: %v", err)
-		}
-	}
+// 		// Insert the serialized vector
+// 		_, err = db.ExecContext(ctx, "INSERT INTO vector_test (id, embedding) VALUES (?, ?)", i+1, serialized)
+// 		if err != nil {
+// 			t.Fatalf("Failed to insert vector: %v", err)
+// 		}
+// 	}
 
-	// Test retrieving and deserializing vectors
-	var blob []byte
-	err = db.QueryRowContext(ctx, "SELECT embedding FROM vector_test WHERE id = 1").Scan(&blob)
-	if err != nil {
-		t.Fatalf("Failed to retrieve vector: %v", err)
-	}
+// 	// Test retrieving and deserializing vectors
+// 	var blob []byte
+// 	err = db.QueryRowContext(ctx, "SELECT embedding FROM vector_test WHERE id = 1").Scan(&blob)
+// 	if err != nil {
+// 		t.Fatalf("Failed to retrieve vector: %v", err)
+// 	}
 
-	// Deserialize the vector
-	vec, err := DeserializeFloat32(blob)
-	if err != nil {
-		t.Fatalf("Failed to deserialize vector: %v", err)
-	}
+// 	// Deserialize the vector
+// 	vec, err := DeserializeFloat32(blob)
+// 	if err != nil {
+// 		t.Fatalf("Failed to deserialize vector: %v", err)
+// 	}
 
-	// Verify the vector values match what we inserted
-	expectedVec := testVectors[0]
-	if len(vec) != len(expectedVec) {
-		t.Fatalf("Vector dimension mismatch: got %d, expected %d", len(vec), len(expectedVec))
-	}
+// 	// Verify the vector values match what we inserted
+// 	expectedVec := testVectors[0]
+// 	if len(vec) != len(expectedVec) {
+// 		t.Fatalf("Vector dimension mismatch: got %d, expected %d", len(vec), len(expectedVec))
+// 	}
 
-	for i, v := range vec {
-		if v != expectedVec[i] {
-			t.Errorf("Vector value mismatch at index %d: got %f, expected %f", i, v, expectedVec[i])
-		}
-	}
+// 	for i, v := range vec {
+// 		if v != expectedVec[i] {
+// 			t.Errorf("Vector value mismatch at index %d: got %f, expected %f", i, v, expectedVec[i])
+// 		}
+// 	}
 
-	// Skip vector distance tests that depend on LibSQL functions
-	t.Log("Vector serialization and deserialization with sqlite_vec working correctly")
-}
+// 	// Skip vector distance tests that depend on LibSQL functions
+// 	t.Log("Vector serialization and deserialization with sqlite_vec working correctly")
+// }
 
 func TestFileDatabasePersistence(t *testing.T) {
 	// Use a temporary file for testing persistence
